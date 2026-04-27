@@ -8,7 +8,7 @@ export const metadata = {
 export default function RootLayout({ children }) {
   // Hardcoded to RTL for Israeli market MVP, but structurally easy to swap
   return (
-    <html lang="he" dir="rtl">
+    <html lang="he" dir="rtl" suppressHydrationWarning>
       <body>
         {children}
       </body>

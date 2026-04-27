@@ -50,3 +50,22 @@ CREATE TABLE IF NOT EXISTS public.verifications (
 ALTER TABLE public.verifications ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Chefs can view and insert own verifications" ON public.verifications FOR ALL USING (auth.uid() = chef_id);
 -- Admins will bypass RLS or use a secure admin role to approve verifications.
+
+-- 4. Digital Products & Video Guides Table
+CREATE TABLE IF NOT EXISTS public.digital_products (
+  id uuid default gen_random_uuid() primary key,
+  chef_id uuid references public.profiles(id) not null,
+  title text not null,
+  description text,
+  video_url text, -- URL to Supabase Storage or external hosted mp4
+  price numeric not null default 0,
+  is_premium boolean not null default false,
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null
+);
+
+-- RLS for Digital Products
+ALTER TABLE public.digital_products ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Products are viewable by everyone." ON public.digital_products FOR SELECT USING (true);
+CREATE POLICY "Chefs can insert their own products" ON public.digital_products FOR INSERT WITH CHECK (auth.uid() = chef_id);
+CREATE POLICY "Chefs can update own products" ON public.digital_products FOR UPDATE USING (auth.uid() = chef_id);
+CREATE POLICY "Chefs can delete own products" ON public.digital_products FOR DELETE USING (auth.uid() = chef_id);

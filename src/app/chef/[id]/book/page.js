@@ -1,15 +1,46 @@
 "use client";
 
-import { useState, use } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
-import { chefs } from "@/lib/mockData";
+import { useParams, useSearchParams, useRouter } from "next/navigation";
+import { supabase } from "@/lib/supabase";
 
-export default function BookingFlow({ params }) {
-  const resolvedParams = use(params);
-  const [step, setStep] = useState(1);
-  const chef = chefs.find((c) => c.id === resolvedParams.id);
+export default function BookingFlow() {
+  const params = useParams();
+  const searchParams = useSearchParams();
+  const router = useRouter();
   
-  if (!chef) return <div style={{textAlign: "center", padding: "40px"}}>Chef not found</div>;
+  const [step, setStep] = useState(1);
+  const [chef, setChef] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  // Form State
+  const initialDate = searchParams?.get('date') || '';
+  const initialGuests = searchParams?.get('guests') || 2;
+  const [eventDate, setEventDate] = useState(initialDate);
+  const [guests, setGuests] = useState(initialGuests);
+  const [eventTime, setEventTime] = useState("");
+  const [location, setLocation] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    const fetchChef = async () => {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', params.id)
+        .single();
+      
+      if (data) {
+        setChef(data);
+      }
+      setLoading(false);
+    };
+    if (params.id) fetchChef();
+  }, [params.id]);
+
+  if (loading) return <div style={{textAlign: "center", padding: "80px"}}>טוען... (Loading...)</div>;
+  if (!chef) return <div style={{textAlign: "center", padding: "80px"}}>Chef not found</div>;
 
   return (
     <main className="container" style={{ paddingTop: '40px', paddingBottom: '80px', maxWidth: '800px' }}>
@@ -20,7 +51,7 @@ export default function BookingFlow({ params }) {
       </nav>
 
       <div className="glass" style={{ padding: '40px', borderRadius: '16px' }}>
-        <h1 style={{ fontSize: '2.5rem', marginBottom: '8px' }}>הזמנה: {chef.name}</h1>
+        <h1 style={{ fontSize: '2.5rem', marginBottom: '8px' }}>הזמנה: {chef.full_name}</h1>
         <p style={{ color: 'var(--text-secondary)', marginBottom: '40px', fontSize: '1.2rem' }}>
           שלב {step} מתוך 3
         </p>
@@ -31,15 +62,15 @@ export default function BookingFlow({ params }) {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', marginBottom: '40px' }}>
               <label>
                  <span style={{display: "block", marginBottom: "8px"}}>תאריך האירוע (Date)</span>
-                 <input type="date" className="input-field" />
+                 <input type="date" className="input-field" value={eventDate} onChange={(e) => setEventDate(e.target.value)} />
               </label>
               <label>
                  <span style={{display: "block", marginBottom: "8px"}}>שעה (Time)</span>
-                 <input type="time" className="input-field" />
+                 <input type="time" className="input-field" value={eventTime} onChange={(e) => setEventTime(e.target.value)} />
               </label>
               <label>
                  <span style={{display: "block", marginBottom: "8px"}}>מיקום האירוע (Location/Address)</span>
-                 <input type="text" placeholder="הכנס כתובת לתמחור נסיעות..." className="input-field" />
+                 <input type="text" placeholder="הכנס כתובת לתמחור נסיעות..." className="input-field" value={location} onChange={(e) => setLocation(e.target.value)} />
               </label>
             </div>
             <button className="btn btn-primary" onClick={() => setStep(2)}>המשך (Next Step)</button>
@@ -52,7 +83,7 @@ export default function BookingFlow({ params }) {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', marginBottom: '40px' }}>
               <label>
                  <span style={{display: "block", marginBottom: "8px"}}>כמות סועדים (Number of Guests)</span>
-                 <input type="number" placeholder="2-20" min="2" max="20" className="input-field" />
+                 <input type="number" placeholder="2-20" min="2" max="50" className="input-field" value={guests} onChange={(e) => setGuests(parseInt(e.target.value) || 2)} />
               </label>
               <label>
                  <span style={{display: "block", marginBottom: "8px"}}>סגנון אירוע מעודף (Preferred Style)</span>
@@ -80,13 +111,13 @@ export default function BookingFlow({ params }) {
             <div style={{ background: 'var(--bg-secondary)', padding: '32px', borderRadius: '12px', marginBottom: '40px' }}>
               
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px', fontSize: '1.2rem' }}>
-                <span>{chef.name}</span>
-                <span>{chef.priceRange} לאדם</span>
+                <span>{chef.full_name}</span>
+                <span>₪{chef.hourly_rate || 250} לאדם</span>
               </div>
               
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px', color: 'var(--text-secondary)' }}>
-                <span>עלות עבור 4 סועדים (Cost for 4)</span>
-                <span>₪2,000</span>
+                <span>עלות עבור {guests} סועדים (Cost for {guests})</span>
+                <span>₪{(chef.hourly_rate || 250) * guests}</span>
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '24px', color: 'var(--text-secondary)' }}>
@@ -96,14 +127,48 @@ export default function BookingFlow({ params }) {
 
               <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid var(--border-color)', paddingTop: '24px', fontWeight: 'bold', fontSize: '1.5rem', color: 'var(--accent-gold)' }}>
                 <span>סה"כ לתשלום עכשיו (Total Due Now)</span>
-                <span>₪2,150</span>
+                <span>₪{((chef.hourly_rate || 250) * guests) + 150}</span>
               </div>
 
             </div>
             <div style={{ display: 'flex', gap: '16px' }}>
-               <button className="btn btn-outline" onClick={() => setStep(2)}>חזור (Back)</button>
-               {/* In a real app, this wraps a Stripe Element. For now, it's just a button. */}
-               <button className="btn btn-primary" onClick={() => alert("✅ Stripe Checkout Flow Initiated!")}>תשלום מאובטח ב-Stripe (Secure Checkout)</button>
+               <button className="btn btn-outline" onClick={() => setStep(2)} disabled={submitting}>חזור (Back)</button>
+               <button 
+                 className="btn btn-primary" 
+                 disabled={submitting}
+                 onClick={async () => {
+                   setSubmitting(true);
+                   const guestAuth = await supabase.auth.getSession();
+                   
+                   if (!guestAuth.data.session) {
+                      alert("Please login first to make a booking! (Auth constraint)");
+                      router.push('/portal/login');
+                      return;
+                   }
+
+                   // Format date handling manually for MVP
+                   const isoDate = new Date(`${eventDate}T${eventTime || '12:00'}:00`).toISOString();
+
+                   const { error } = await supabase.from('bookings').insert({
+                      customer_id: guestAuth.data.session.user.id,
+                      chef_id: chef.id,
+                      event_date: isoDate,
+                      guest_count: guests,
+                      status: 'pending_chef_approval',
+                      total_price: ((chef.hourly_rate || 250) * guests) + 150
+                   });
+
+                   if (error) {
+                     alert("Booking failed: " + error.message);
+                     setSubmitting(false);
+                   } else {
+                     alert("🎉 Booking highly successful! The chef will get back to you soon!");
+                     router.push('/portal'); // Or customer dashboard if we make one
+                   }
+                 }}
+               >
+                 {submitting ? "מעבד..." : "תשלום מאובטח ב-Stripe (Secure Checkout)"}
+               </button>
             </div>
           </div>
         )}
